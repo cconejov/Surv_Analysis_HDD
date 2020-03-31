@@ -4,6 +4,7 @@ library("data.table")
 library("tidyverse")
 library("survival")
 library("survminer")
+library("KMsurv")
 
 
 ## Load data
@@ -19,10 +20,23 @@ data_group <-  data_group %>%
                        max_date = as.Date(max_date),
                        first_date_fail = as.Date(first_date_fail)
                       ) %>% 
-                select(-V1)
+                select(-V1) %>% 
+               filter(age >= 0)
 
 
 summary(data_group)
+
+##
+
+psymbol <- data_group$fail + 1
+table(psymbol)
+plot(data_group$age, data_group$study_time, pch=(psymbol))
+legend(40, 60, c("Censor=1", "Censor=0"), pch=(psymbol))
+
+ggplot(data = data_group) +
+  geom_point(aes(x = age, y = study_time, 
+                 shape = as.factor(fail), color = as.factor(fail) ))
+
 
 
 ## Number of fails for day
@@ -81,19 +95,22 @@ print(km_survival_HDD)
 #           ylim = c(0.975,1),
 #           legend.lab = "All Models")
 
+#plot(km_survival_HDD)
+
 # Graph
 ggsurvplot(
   km_survival_HDD, 
   data       = data_group, 
-  ylim       = c(0.975,1),
-  size       = 1,                   # change line size
+  ylim       = c(0.85,1),
+  #size       = 1,                   # change line size
   palette    = "#2E9FDF",           # custom color palettes
   conf.int   = TRUE,                # Add confidence interval
   risk.table = TRUE,                # Add risk table
   risk.table.col    = "strata",     # Risk table color by groups
-  legend.lab        = "All Models", # Change legend labels
+  legend.lab        = "All HD Models", # Change legend labels
   risk.table.height = 0.25,         # Useful to change when you have multiple groups
-  ggtheme           = theme_bw()    # Change ggplot2 theme
+  ggtheme           = theme_bw(),    # Change ggplot2 theme
+  title             = "Kaplan-Meier Failure Estimates Hard Disk"
 )
 
 # 1.2) cumulative hazard
@@ -108,11 +125,13 @@ ggsurvplot(km_survival_HDD,
 # 2) Kaplan-Meier non-parametric analysis by model
 km_survival_model <- survfit(surv_object_HDD ~ model)
 
+plot(km_survival_model)
+
 
 ggsurvplot(km_survival_model, 
            data = data_group,
-           ylim = c(0.95,1),
-           legend.lab = c("DELLBOSS", "HGST", "Hitachi", "Seagate","TOSHIBA", "WDC"),
+           ylim = c(0.6, 1),
+           legend.lab = c("HGST", "Hitachi", "Seagate","TOSHIBA", "WDC"),
            risk.table = TRUE
            )
 
@@ -124,7 +143,7 @@ print(na_survival_HDD)
 ggsurvplot(
   na_survival_HDD, 
   data       = data_group, 
-  ylim       = c(0.975,1),
+  ylim       = c(0.85,1),
   size       = 1,                   # change line size
   palette    = "#2E9FDF",           # custom color palettes
   conf.int   = TRUE,                # Add confidence interval
@@ -132,8 +151,9 @@ ggsurvplot(
   risk.table.col    = "strata",     # Risk table color by groups
   legend.lab        = "All Models", # Change legend labels
   risk.table.height = 0.25,         # Useful to change when you have multiple groups
-  ggtheme           = theme_bw()    # Change ggplot2 theme
-)
+  ggtheme           = theme_bw(),    # Change ggplot2 theme
+  title             = "Nelson-Aalen Failure Estimates Hard Disk"
+  )
 
 
 # 4) Univariate Compute the Cox model
