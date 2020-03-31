@@ -13,34 +13,48 @@ file_names <- list.files("data/drive_stats_2019",
 data <- rbindlist(lapply(file_names,function(x) fread(input = x,
                                                     header = TRUE,
                                                     stringsAsFactors = FALSE,
-                                                    select = c("date", "serial_number", "model","capacity_bytes","failure", "smart_9_raw") ))
+                                                    select = c("date", "serial_number", "model","capacity_bytes","failure",
+                                                               "smart_9_raw",
+                                                               "smart_5_normalized", "smart_10_normalized",
+                                                               "smart_197_normalized","smart_198_normalized") 
+                                                      )                 
+                         )
                   )
 
-data <- data %>%
-  mutate(model = ifelse(grepl("^ST",model),'Seagate',str_extract(model, "^[^\\s]+")),
-         capacity_bytes = round(capacity_bytes/10e11)
-         )
+# Modified columns capacity_bytes and models
+data[, c("capacity_bytes", "model") := list(round(capacity_bytes/10e11),
+                                            ifelse(grepl("^ST",model),'Seagate',str_extract(model, "^[^\\s]+")))]
 
-## Group of data
+# Number of NA
 
-max_hour_smart_9_raw <- max(data$smart_9_raw[!is.na(data$smart_9_raw)]) + 1
-
-
-data_group <- data %>% 
-  group_by(serial_number, model) %>% 
-  summarise(TB = max(capacity_bytes),
-            count_obs = n(),
-            min_date = min(date),
-            max_date = max(date),
-            min_Hours = min(smart_9_raw),
-            max_Hours = max(smart_9_raw),
-            count_fail = sum(failure),
-            fail       = max(failure),
-            first_date_fail = min(ifelse(failure == 1, date,"2020-01-01")),
-            first_hour_fail = min(ifelse(failure == 1, smart_9_raw, max_hour_smart_9_raw))
-  )
+n_col <- dim(data)[2]
+data[, lapply(.SD, function(x) sum(is.na(x))), .SDcols = 1:n_col]
 
 
+## Group of data using data table commands
+
+max_hour_smart_9_raw <- as.integer(max(data$smart_9_raw[!is.na(data$smart_9_raw)]) + 1)
+
+data_group <- data[, list(TB = max(capacity_bytes),
+                          count_obs = .N,
+                          min_date = min(date),
+                          max_date = max(date),
+                          min_Hours = min(smart_9_raw),
+                          max_Hours = max(smart_9_raw),
+                          count_fail = sum(failure),
+                          fail       = max(failure),
+                          first_date_fail = min(ifelse(failure == 1, date,"2020-01-01")),
+                          first_hour_fail = min(ifelse(failure == 1, smart_9_raw, max_hour_smart_9_raw)),
+                          mean_reallocated   = mean(smart_5_normalized),
+                          mean_spin_retry    = mean(smart_10_normalized),
+                          mean_current_pend  = mean(smart_197_normalized),
+                          mean_uncorrectable = mean(smart_198_normalized)
+                          ),
+by =.(serial_number, model)]
+
+
+head(data_group)
+summary(data_group)
 
 ## Independent variables
 
@@ -55,20 +69,16 @@ write.csv(x =  data_group,
           file = "output/data/data_group_2019.csv")
 
 
-problem_raw <- data %>% filter(serial_number == "ZA153SZQ")
+problem_raw_2Fails <- data %>% filter(serial_number == "ZA153SZQ")
 
 #ZCH07Q3L / ZA153SZQ
 
 ## save register for hiphotesis taken
 
-write.csv(x =  problem_raw,
+write.csv(x =  problem_raw_2Fails,
           file = "output/data/problem_HDD_2Fails.csv")
 
-
-# Multiple register: 2AG8AVRY, 2AGKYLBY
-
-problem_raw <- data_group %>% filter(serial_number == "2AG8AVRY")
-
+# Subset of fails
 
 fails <- data_group %>% filter(count_fail > 0)
 
