@@ -13,17 +13,22 @@ file_names <- list.files("data/drive_stats_2019",
 data <- rbindlist(lapply(file_names,function(x) fread(input = x,
                                                     header = TRUE,
                                                     stringsAsFactors = FALSE,
-                                                    select = c("date", "serial_number", "model","capacity_bytes","failure",
-                                                               "smart_9_raw",
-                                                               "smart_5_normalized", "smart_10_normalized",
-                                                               "smart_197_normalized","smart_198_normalized") 
+                                                    select = c("date", "serial_number", 
+                                                               "model", "capacity_bytes",
+                                                               "failure", "smart_9_raw",
+                                                               "smart_5_normalized", 
+                                                               "smart_10_normalized",
+                                                               "smart_197_normalized",
+                                                               "smart_198_normalized") 
                                                       )                 
                          )
                   )
 
 # Modified columns capacity_bytes and models
 data[, c("capacity_bytes", "model") := list(round(capacity_bytes/10e11),
-                                            ifelse(grepl("^ST",model),'Seagate',str_extract(model, "^[^\\s]+")))]
+                                            ifelse(grepl("^ST",model),
+                                                   'Seagate',
+                                                   str_extract(model, "^[^\\s]+")))]
 
 # Number of NA
 
@@ -56,7 +61,10 @@ by =.(serial_number, model)]
 head(data_group)
 summary(data_group)
 
-## Independent variables
+# Creation variables for survival models
+# age: Count of hours of first power on measure in days
+# study_time: Count of days between the first measure and the last measure
+#             or measure of fail 
 
 data_group <- data_group %>% 
   mutate(age = floor(min_Hours/24),
